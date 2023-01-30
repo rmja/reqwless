@@ -1,14 +1,15 @@
+/// Client using embedded-nal-async traits to establish connections and perform HTTP requests.
+///
 use crate::headers::ContentType;
 use crate::request::*;
 use crate::response::*;
-/// Client using embedded-nal-async traits to establish connections and perform HTTP requests.
-///
-use crate::url::{Url, UrlScheme};
 use crate::{request, Error};
 use embedded_io::asynch::{Read, Write};
 use embedded_io::Error as _;
 use embedded_nal_async::{Dns, SocketAddr, TcpConnect};
 use embedded_tls::{Aes128GcmSha256, TlsConnection};
+use nourl::Url;
+use nourl::UrlScheme;
 use rand_chacha::ChaCha8Rng;
 use rand_core::{RngCore, SeedableRng};
 
@@ -69,7 +70,7 @@ where
         url: &Url<'m>,
     ) -> Result<HttpConnection<T::Connection<'m>, TlsConnection<'m, T::Connection<'m>, Aes128GcmSha256>>, Error> {
         let host = url.host();
-        let port = url.port();
+        let port = url.port_or_default();
 
         let remote = self
             .dns
@@ -86,7 +87,7 @@ where
         if url.scheme() == UrlScheme::HTTPS {
             if let Some(tls) = self.tls.as_mut() {
                 use embedded_tls::{TlsConfig, TlsContext};
-                let mut rng = ChaCha8Rng::seed_from_u64(tls.seed as u64);
+                let mut rng = ChaCha8Rng::seed_from_u64(tls.seed);
                 tls.seed = rng.next_u64();
                 let mut config = TlsConfig::new().with_server_name(url.host());
                 if let TlsVerify::Psk { identity, psk } = tls.verify {
@@ -116,7 +117,7 @@ where
         HttpRequestBuilder<HttpConnection<T::Connection<'m>, TlsConnection<'m, T::Connection<'m>, Aes128GcmSha256>>>,
         Error,
     > {
-        let url = Url::parse(url)?;
+        let url = Url::parse(url).map_err(|_| Error::InvalidUrl)?;
         let builder: request::RequestBuilder<'m> = Request::new(method, url.path()).host(url.host());
 
         let conn = self.connect(&url).await?;

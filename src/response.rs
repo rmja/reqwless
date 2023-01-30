@@ -45,7 +45,7 @@ impl<'a> Response<'a> {
             let mut response = httparse::Response::new(&mut headers);
             let parse_status = response.parse(&header_buf[..pos]).map_err(|_| Error::Codec)?;
             if parse_status.is_complete() {
-                header_len = parse_status.unwrap().into();
+                header_len = parse_status.unwrap();
                 break;
             } else {
             }
